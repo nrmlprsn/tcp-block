@@ -25,20 +25,20 @@ void usage(){
 }
 
 uint16_t checksum(const void* data, size_t len){
-	const uint8_t* p = reinterpret_cast<const uint8_t*>(data);
+	const uint8_t* p = (const uint8_t*)(data);
 	uint32_t sum = 0;
 
 	while(len > 1){
-		sum += static_cast<uint16_t>((p[0] << 8) | p[1]);
+		sum += (uint16_t)((p[0] << 8) | p[1]);
 		p += 2;
 		len -= 2;
 	}
 
-	if(len == 1) sum += static_cast<uint16_t>(p[0] << 8);
+	if(len == 1) sum += (uint16_t)(p[0] << 8);
 
 	while(sum >> 16) sum = (sum & 0xffff) + (sum >> 16);
 
-	return htons(static_cast<uint16_t>(~sum));
+	return htons((uint16_t)(~sum));
 }
 
 uint16_t tcp_checksum(const ip_hdr* ip, const tcp_hdr* tcp, const uint8_t* data, size_t data_len){
@@ -57,7 +57,7 @@ uint16_t tcp_checksum(const ip_hdr* ip, const tcp_hdr* tcp, const uint8_t* data,
 	pseudo.dip = ip->dip;
 	pseudo.zero = 0;
 	pseudo.protocol = ip_hdr::TCP;
-	pseudo.tcp_len = htons(static_cast<uint16_t>(tcp_len));
+	pseudo.tcp_len = htons((uint16_t)(tcp_len));
 
 	vector<uint8_t> buf(sizeof(pseudo_hdr) + tcp_len);
 	memcpy(buf.data(), &pseudo, sizeof(pseudo_hdr));
@@ -74,7 +74,7 @@ bool find_pattern(const uint8_t* data, size_t data_len, const string& pattern){
 
 	const uint8_t* begin = data;
 	const uint8_t* end = data + data_len;
-	const uint8_t* p_begin = reinterpret_cast<const uint8_t*>(pattern.data());
+	const uint8_t* p_begin = (const uint8_t*)(pattern.data());
 	const uint8_t* p_end = p_begin + pattern.size();
 
 	return search(begin, end, p_begin, p_end) != end;
@@ -99,7 +99,7 @@ void make_tcp(tcp_hdr* tcp, uint16_t sport, uint16_t dport, uint32_t seq, uint32
 	tcp->dport = dport;
 	tcp->seq = htonl(seq);
 	tcp->ack = htonl(ack);
-	tcp->off_rsv = static_cast<uint8_t>((sizeof(tcp_hdr) / 4) << 4);
+	tcp->off_rsv = (uint8_t)((sizeof(tcp_hdr) / 4) << 4);
 	tcp->flags = flags;
 	tcp->win = htons(0);
 	tcp->sum = 0;
@@ -110,40 +110,40 @@ bool send_rst(pcap_t* handle, const eth_hdr* old_eth, const ip_hdr* old_ip, cons
 	size_t packet_len = sizeof(eth_hdr) + sizeof(ip_hdr) + sizeof(tcp_hdr);
 	vector<uint8_t> packet(packet_len);
 
-	auto eth = reinterpret_cast<eth_hdr*>(packet.data());
-	auto ip = reinterpret_cast<ip_hdr*>(packet.data() + sizeof(eth_hdr));
-	auto tcp = reinterpret_cast<tcp_hdr*>(packet.data() + sizeof(eth_hdr) + sizeof(ip_hdr));
+	auto eth = (eth_hdr*)(packet.data());
+	auto ip = (ip_hdr*)(packet.data() + sizeof(eth_hdr));
+	auto tcp = (tcp_hdr*)(packet.data() + sizeof(eth_hdr) + sizeof(ip_hdr));
 
 	memcpy(eth, old_eth, sizeof(eth_hdr));
 	eth->type = htons(eth_hdr::IP4);
 
-	uint32_t seq = ntohl(old_tcp->seq) + static_cast<uint32_t>(old_data_len);
+	uint32_t seq = ntohl(old_tcp->seq) + (uint32_t)(old_data_len);
 	uint32_t ack = ntohl(old_tcp->ack);
 
 	make_ip(ip, sizeof(ip_hdr) + sizeof(tcp_hdr), old_ip->sip, old_ip->dip);
 	make_tcp(tcp, old_tcp->sport, old_tcp->dport, seq, ack, tcp_hdr::RST | tcp_hdr::ACK);
 	tcp->sum = tcp_checksum(ip, tcp, nullptr, 0);
 
-	return pcap_sendpacket(handle, packet.data(), static_cast<int>(packet.size())) == 0;
+	return pcap_sendpacket(handle, packet.data(), (int)(packet.size())) == 0;
 }
 
 bool send_fin(int raw_s, const ip_hdr* old_ip, const tcp_hdr* old_tcp, size_t old_data_len){
-	const uint8_t* data = reinterpret_cast<const uint8_t*>(redirect_msg);
+	const uint8_t* data = (const uint8_t*)(redirect_msg);
 	size_t data_len = strlen(redirect_msg);
 	size_t packet_len = sizeof(ip_hdr) + sizeof(tcp_hdr) + data_len;
 
 	vector<uint8_t> packet(packet_len);
 
-	auto ip = reinterpret_cast<ip_hdr*>(packet.data());
-	auto tcp = reinterpret_cast<tcp_hdr*>(packet.data() + sizeof(ip_hdr));
+	auto ip = (ip_hdr*)(packet.data());
+	auto tcp = (tcp_hdr*)(packet.data() + sizeof(ip_hdr));
 	auto tcp_data = packet.data() + sizeof(ip_hdr) + sizeof(tcp_hdr);
 
 	memcpy(tcp_data, data, data_len);
 
 	uint32_t seq = ntohl(old_tcp->ack);
-	uint32_t ack = ntohl(old_tcp->seq) + static_cast<uint32_t>(old_data_len);
+	uint32_t ack = ntohl(old_tcp->seq) + (uint32_t)(old_data_len);
 
-	make_ip(ip, static_cast<uint16_t>(packet_len), old_ip->dip, old_ip->sip);
+	make_ip(ip, (uint16_t)(packet_len), old_ip->dip, old_ip->sip);
 	make_tcp(tcp, old_tcp->dport, old_tcp->sport, seq, ack, tcp_hdr::FIN | tcp_hdr::ACK);
 	tcp->sum = tcp_checksum(ip, tcp, tcp_data, data_len);
 
@@ -152,8 +152,8 @@ bool send_fin(int raw_s, const ip_hdr* old_ip, const tcp_hdr* old_tcp, size_t ol
 	addr.sin_addr.s_addr = old_ip->sip;
 	addr.sin_port = old_tcp->sport;
 
-	auto sent = sendto(raw_s, packet.data(), packet.size(), 0, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
-	return sent == static_cast<ssize_t>(packet.size());
+	auto sent = sendto(raw_s, packet.data(), packet.size(), 0, (sockaddr*)(&addr), sizeof(addr));
+	return sent == (ssize_t)(packet.size());
 }
 
 void block_packet(pcap_t* handle, int raw_s, const eth_hdr* eth, const ip_hdr* ip, const tcp_hdr* tcp, size_t data_len){
